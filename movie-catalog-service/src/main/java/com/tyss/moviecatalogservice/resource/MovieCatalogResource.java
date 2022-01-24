@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.tyss.moviecatalogservice.models.CatalogItem;
 import com.tyss.moviecatalogservice.models.Movie;
 import com.tyss.moviecatalogservice.models.Rating;
@@ -28,9 +29,8 @@ public class MovieCatalogResource {
 	private WebClient.Builder builder;
 
 	@RequestMapping("/{userId}")
+	@HystrixCommand(fallbackMethod = "getFallbackCatalog")
 	public List<CatalogItem> getCatalog(@PathVariable String userId) {
-		
-		
 
 //		Movie movie = restTemplate.getForObject("http://localhost:8081/movies/", Movie.class);
 
@@ -39,20 +39,31 @@ public class MovieCatalogResource {
 
 //		);
 
-		//for each movieId, call movie info service and get details
-		UserRating userRating = restTemplate.getForObject("http://ratings-data-service/ratingsdata/users/" + userId, UserRating.class);
+		// for each movieId, call movie info service and get details
+//		UserRating userRating = restTemplate.getForObject("http://ratings-data-service/ratingsdata/users/" + userId, UserRating.class);
+//		return userRating.getRatings().stream().map(rating -> {
+//			Movie movie = restTemplate.getForObject("http://movie-info-service/movies/" + rating.getMovieId(), Movie.class);
+//  
+//			/*
+//			 * Movie movie = builder.build().get().uri("http://localhost:8081/movies/" +
+//			 * rating.getMovieId()).retrieve() .bodyToMono(Movie.class).block();
+//			 */
+//			
+//			//put them all together
+//			return new CatalogItem(movie.getName(), "Test", rating.getRating());
+//		}).collect(Collectors.toList());
+		UserRating userRating = restTemplate.getForObject("http://ratings-data-service/ratingsdata/users/" + userId,
+				UserRating.class);
 		return userRating.getRatings().stream().map(rating -> {
-			Movie movie = restTemplate.getForObject("http://movie-info-service/movies/" + rating.getMovieId(), Movie.class);
-
-			/*
-			 * Movie movie = builder.build().get().uri("http://localhost:8081/movies/" +
-			 * rating.getMovieId()).retrieve() .bodyToMono(Movie.class).block();
-			 */
-			
-			//put them all together
-			return new CatalogItem(movie.getName(), "Test", rating.getRating());
+			Movie movie = restTemplate.getForObject("http://movie-info-service/movies/" + rating.getMovieId(),
+					Movie.class);
+			return new CatalogItem(movie.getName(), movie.getDescription(), rating.getRating());
 		}).collect(Collectors.toList());
 	}
 
 //		return Collections.singletonList(new CatalogItem("KGF", "Test", 4));
+	
+	public List<CatalogItem> getFallbackCatalog(@PathVariable String userId) {
+		return Arrays.asList(new CatalogItem("No Moview", "", 0));
+	}
 }
